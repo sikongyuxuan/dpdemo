@@ -6,4 +6,4 @@ metadata:
 spec:
   type: file
   targets:
-    - ./register-existing-component/template.yaml
+    - ./register-existing-component-demo/template.yaml
