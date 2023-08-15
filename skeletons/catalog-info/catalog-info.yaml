@@ -1,0 +1,57 @@
+apiVersion: backstage.io/v1alpha1
+{%- if values.entityKind %}
+kind: ${{ values.entityKind }}
+{%- else %}
+kind: Component
+{%- endif %}
+metadata:
+  name: ${{ values.name }}
+  title: ${{ values.displayName }}
+  {%- if values.description %}
+  description: ${{ values.description }}
+  {%- endif %}
+  annotations:
+    {%- if values.gitRepo %}
+    {%- if values.gitInstance.search('github') === -1 %}
+    # gitlab plugin
+    gitlab.com/project-slug: ${{ values.gitRepo }}
+    gitlab.com/instance: ${{ values.gitInstance }}
+    {%- else %}
+    # github plugin
+    github.com/project-slug: ${{ values.gitRepo }}
+    {%- endif %}
+    {%- endif %}
+
+    {%- if values.ciPipelineUrl %}
+    # acp cicd plugin
+    acp.cpaas.io/ci-pipeline: ${{ values.acpCiPipeline }}
+    {%- if values.acpInstance %}
+    acp.cpaas.io/instance: ${{ values.acpInstance }}
+    {%- else %}
+    acp.cpaas.io/instance: edge.alauda.cn
+    {%- endif %}
+    {%- endif %}
+
+    {%- if values.harborRepo %}
+    # harbor plugin
+    goharbor.io/repository-slug: ${{values.harborRepo}}
+    {%- endif %}
+
+    {%- if values.sonarRepo %}
+    # sonarqube plugin
+    sonarqube.org/project-key: ${{values.sonarRepo}}
+    {%- endif %}
+
+    {%- if values.techdocs %}
+    # backstage techdocs plugin
+    backstage.io/techdocs-ref: dir:.
+    {%- endif %}
+
+spec:
+  type: ${{ values.applicationType }}
+  {%- if values.system %}
+  system: ${{ values.system }}
+  {%- endif %}
+  lifecycle: production
+  owner: ${{ values.owner }}
+

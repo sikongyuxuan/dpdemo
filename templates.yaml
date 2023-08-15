@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: builtin-software-templates
+  description: A collection of builtin templates for DP
+spec:
+  type: file
+  targets:
+    - ./register-existing-component/template.yaml

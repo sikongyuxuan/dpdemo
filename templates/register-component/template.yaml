@@ -1,0 +1,159 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: register-existing-component-demo
+  title: Register An Existing Component-demo
+  description: Register an existing component to the catalog.
+  tags:
+    - recommended
+    - register
+    - catalog
+spec:
+  owner: user:default/dp
+  type: service
+
+  parameters:
+    - title: Provide git repository information
+      required:
+        - gitRepo
+      properties:
+        gitRepo:
+          title: Git Repository
+          type: string
+          description: 'The URL of the git repository, support gitlab and github. e.g: https://gitlab.com/devops/idp'
+        docPath:
+          title: 'Docs Path'
+          type: string
+          description: 'The path to the documentation directory, relative to the root directory. e.g: ./docs'
+    - title: Provide basic information about the component
+      required:
+        - name
+        - displayName
+        - applicationType
+        - owner
+      properties:
+        name:
+          title: Component Name
+          type: string
+        displayName:
+          title: Display Name
+          type: string
+          description: The readable name of the component
+        description:
+          title: Description
+          type: string
+          description: Provide a description of the component(optional)
+        applicationType:
+          title: Application Type
+          type: string
+          enum:
+            - service
+            - website
+        owner:
+          title: Owner
+          type: string
+          ui:field: DPOwnerPicker
+          description: Specify the owner of the component
+        system:
+          title: System
+          type: string
+          description: Set the system to which the component belongs
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind:
+                - System
+    - title: Provide more information related to the component
+      properties:
+        ciPipelineUrl:
+          title: CI Pipeline URL
+          type: string
+          description: 'The access URL of the CI pipeline, only acp devops is supported, e.g: https://example.cn/console-devops/workspace/project/ci?namespace=test-ns&cluster=test-cluster&buildName=test-build'
+        images:
+          title: Artifact URL
+          type: string
+          description: 'The artifacts related to the component, separated by commas if there is more than one. e.g: harbor.example.cn/aaa/bbb,harbor.example.cn/ccc/ddd'
+        sonarProjectUrl:
+          title: Sonar Project URL
+          type: string
+          description: 'The URL of the SonarQube project. e.g: https://sonar.example.cn/dashboard?id=xxx'
+  steps:
+    - id: parseRepo
+      name: Parse git repo
+      action: utils:string:regexPicker
+      input:
+        str: ${{ parameters.gitRepo }}
+        regex: '^https?:\/\/(.+?)\/(.+?)\/([^/]*)$'
+    - id: parseSonarProjectUrl
+      name: Parse the url of sonarqube project
+      action: utils:string:regexPicker
+      if: ${{ parameters.sonarProjectUrl }}
+      input:
+        str: ${{ parameters.sonarProjectUrl }}
+        regex: '.*id=([^&]+).*'
+    - id: parseCiPipelineUrl
+      name: Parse the url of the ci pipeline
+      if: ${{ parameters.ciPipelineUrl }}
+      action: url:parser
+      input:
+        url: ${{ parameters.ciPipelineUrl }}
+    - id: docTemplate
+      name: Generate mkdocs.yml file
+      action: fetch:template
+      if: ${{ parameters.docPath }}
+      input:
+        url: ./mkdocs
+        values:
+          name: ${{ parameters.name }}
+          docPath: ${{ parameters.docPath }}
+    - id: catalogTemplate
+      name: Generate the catalog-info.yaml file
+      action: fetch:template
+      input:
+        url: ./catalog-info
+        values:
+          name: ${{ parameters.name }}
+          displayName: ${{ parameters.displayName }}
+          description: ${{ parameters.description }}
+          applicationType: ${{ parameters.applicationType }}
+          owner: ${{ parameters.owner }}
+          system: ${{ parameters.system }}
+          gitRepo: ${{ steps.parseRepo.output.result[2] }}/${{ steps.parseRepo.output.result[3] }}
+          gitInstance: ${{ steps.parseRepo.output.result[1] }}
+          techdocs: ${{ parameters.docPath }}
+          ciPipelineUrl: ${{ parameters.ciPipelineUrl }}
+          acpCiPipeline: ${{ steps.parseCiPipelineUrl.output.paths[2] }}/${{ steps.parseCiPipelineUrl.output.params.cluster }}/${{ steps.parseCiPipelineUrl.output.params.namespace }}/${{ steps.parseCiPipelineUrl.output.params.buildName }}
+          acpInstance: ${{ steps.parseCiPipelineUrl.output.hostname }}
+          sonarRepo: ${{ steps.parseSonarProjectUrl.output.result[1] }}
+          harborRepo: ${{ parameters.images }}
+    - id: publish
+      name: Publish the commit to gitlab Repository
+      action: publish:gitlab:merge-request
+      if: ${{ steps.parseRepo.output.result[1] != 'github.com' }}
+      input:
+        repoUrl: ${{ steps.parseRepo.output.result[1] }}?owner=${{ steps.parseRepo.output.result[2] }}&repo=${{ steps.parseRepo.output.result[3] }}
+        description: '[auto-commit] create catalog-info.yaml'
+        branchName: create-catalog-info-yaml
+        removeSourceBranch: true
+        title: '[auto-commit] create catalog-info.yaml'
+    - id: publish-to-github
+      name: Publish the commit to github Repository
+      action: publish:github:pull-request
+      if: ${{ steps.parseRepo.output.result[1] == 'github.com' }}
+      input:
+        repoUrl: ${{ steps.parseRepo.output.result[1] }}?owner=${{ steps.parseRepo.output.result[2] }}&repo=${{ steps.parseRepo.output.result[3] }}
+        description: '[auto-commit] create catalog-info.yaml'
+        branchName: create-catalog-info-yaml
+        title: '[auto-commit] create catalog-info.yaml'
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        catalogInfoUrl: ${{ parameters.gitRepo }}/blob/${{ steps['publish'].output.targetBranchName }}${{ steps['publish-to-github'].output.targetBranchName }}/catalog-info.yaml
+        optional: true
+  output:
+    links:
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+

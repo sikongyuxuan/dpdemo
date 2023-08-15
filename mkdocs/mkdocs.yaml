@@ -1,0 +1,7 @@
+site_name: ${{ values.name }} Component
+docs_dir: ${{ values.docPath }}
+theme:
+  name: material
+  font: false
+plugins:
+  - techdocs-core
