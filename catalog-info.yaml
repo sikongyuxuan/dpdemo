@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: dpdemo
+  annotations:
+    github.com/project-slug: sikongyuxuan/dpdemo
+spec:
+  type: other
+  lifecycle: unknown
+  owner: admin
